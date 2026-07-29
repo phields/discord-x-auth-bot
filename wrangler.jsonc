@@ -1,0 +1,26 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "discord-auth-bot",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-29",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "vars": {
+    "DISCORD_GUILD_ID": "YOUR_DISCORD_GUILD_ID",
+    "DISCORD_CHANNEL_ID": "YOUR_VERIFY_CHANNEL_ID",
+    "DISCORD_VERIFIED": "YOUR_MEMBER_ROLE_ID",
+    "DISCORD_UNVERIFIED": "YOUR_UNVERIFIED_ROLE_ID",
+    "OAUTH_STATE_TTL_SECONDS": "600"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "discord-auth-bot",
+      "database_id": "YOUR_D1_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ]
+}
