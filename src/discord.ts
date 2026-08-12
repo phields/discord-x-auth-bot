@@ -52,7 +52,7 @@ export const discordApp = new DiscordHono<DiscordEnv>({
     }
     const url = await createAuthorizationUrl(c.env, userId, guildId);
     return c.res({
-      content: "授权链接 10 分钟内有效。完成后将自动获得 Member Role。",
+      content: "授权链接 2 小时内有效。完成后将自动获得 Member Role。",
       flags: EPHEMERAL,
       components: new Components().row(new Button(url, "前往 X 授权", "Link")),
     });

@@ -9,6 +9,8 @@ export type OAuthState = {
   discord_user_id: string;
   guild_id: string;
   code_verifier: string;
+  expires_at: number;
+  used_at: number | null;
 };
 
 export type XAuthRecord = {

@@ -4,6 +4,7 @@ import type { OAuthState } from "./types";
 const X_AUTHORIZE_URL = "https://x.com/i/oauth2/authorize";
 const X_TOKEN_URL = "https://api.x.com/2/oauth2/token";
 const X_ME_URL = "https://api.x.com/2/users/me";
+const DEFAULT_OAUTH_STATE_TTL_SECONDS = 7200;
 
 type XTokenResponse = {
   access_token?: string;
@@ -32,7 +33,10 @@ export async function createAuthorizationUrl(
   const verifier = randomUrlSafe(64);
   const challenge = await pkceChallenge(verifier);
   const now = Math.floor(Date.now() / 1000);
-  const ttl = Number.parseInt(env.OAUTH_STATE_TTL_SECONDS, 10);
+  const configuredTtl = Number.parseInt(env.OAUTH_STATE_TTL_SECONDS, 10);
+  const ttl = Number.isFinite(configuredTtl) && configuredTtl > 0
+    ? configuredTtl
+    : DEFAULT_OAUTH_STATE_TTL_SECONDS;
 
   await env.DB.prepare(
     "INSERT INTO oauth_states (state, discord_user_id, guild_id, code_verifier, expires_at) VALUES (?1, ?2, ?3, ?4, ?5)",
@@ -57,9 +61,23 @@ export async function completeXOAuth(
 ): Promise<{ discordUserId: string; guildId: string; username: string }> {
   const now = Math.floor(Date.now() / 1000);
   const record = await env.DB.prepare(
-    "SELECT discord_user_id, guild_id, code_verifier FROM oauth_states WHERE state = ?1 AND used_at IS NULL AND expires_at >= ?2",
-  ).bind(state, now).first<OAuthState>();
-  if (!record) throw new OAuthError("授权链接无效、已过期或已使用。", 400);
+    "SELECT discord_user_id, guild_id, code_verifier, expires_at, used_at FROM oauth_states WHERE state = ?1",
+  ).bind(state).first<OAuthState>();
+  if (!record) {
+    console.warn(JSON.stringify({ event: "oauth_state_invalid" }));
+    throw new OAuthError("授权链接无效，请返回 Discord 重新发起验证。", 400);
+  }
+  if (record.used_at !== null) {
+    console.warn(JSON.stringify({ event: "oauth_state_already_used" }));
+    throw new OAuthError("该授权链接已经使用，请返回 Discord 重新发起验证。", 409);
+  }
+  if (record.expires_at < now) {
+    console.warn(JSON.stringify({
+      event: "oauth_state_expired",
+      expiredSecondsAgo: now - record.expires_at,
+    }));
+    throw new OAuthError("授权链接已过期，请返回 Discord 重新点击“使用 X 验证”。", 400);
+  }
 
   const consumed = await env.DB.prepare(
     "UPDATE oauth_states SET used_at = ?1 WHERE state = ?2 AND used_at IS NULL",

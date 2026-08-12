@@ -9,7 +9,7 @@
 - 验证成功后添加 `Member` 类普通角色，并移除 `Unverified` 角色。
 - 使用 D1 保存 Discord 与 X 账号映射，不保存 X access token。
 - `/xauth-status user:@成员` 供拥有“管理服务器”权限的管理员查询。
-- OAuth state 一次性使用，默认 10 分钟过期。
+- OAuth state 一次性使用，默认 2 小时过期；回调处理会注册为后台任务，浏览器提前断开也不会中止验证。
 
 > 这是一个 HTTP Interactions Worker，不连接 Discord Gateway，不需要 Privileged Gateway Intents。Discord 账号年龄检查、Wick 和 quarantine 流程不包含在本仓库中。
 
