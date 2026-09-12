@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { discordApp } from "./discord";
 import { completeXOAuth, OAuthError } from "./x-oauth";
+import { syncVerifiedRoles } from "./discord-roles";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -36,42 +37,7 @@ app.get("/oauth/x/callback", async (c) => {
 
 async function finishVerification(env: Env, state: string, code: string): Promise<{ username: string }> {
   const result = await completeXOAuth(env, state, code);
-  if (result.guildId !== env.DISCORD_GUILD_ID) throw new OAuthError("服务器不匹配。", 400);
-  const roleResponse = await fetch(
-      `https://discord.com/api/v10/guilds/${result.guildId}/members/${result.discordUserId}/roles/${env.DISCORD_VERIFIED}`,
-      {
-        method: "PUT",
-        headers: {
-          authorization: `Bot ${env.DISCORD_TOKEN}`,
-          "content-type": "application/json",
-          "x-audit-log-reason": encodeURIComponent("X OAuth verification completed"),
-        },
-      },
-  );
-  if (!roleResponse.ok) {
-    const responseBody = await roleResponse.text();
-    console.error(JSON.stringify({
-      event: "discord_role_grant_failed",
-      status: roleResponse.status,
-      userId: result.discordUserId,
-      roleId: env.DISCORD_VERIFIED,
-      responseBody,
-    }));
-    throw new OAuthError("X 验证成功，但身份组分配失败，请联系管理员。", 502);
-  }
-  const removeResponse = await fetch(
-      `https://discord.com/api/v10/guilds/${result.guildId}/members/${result.discordUserId}/roles/${env.DISCORD_UNVERIFIED}`,
-      {
-        method: "DELETE",
-        headers: {
-          authorization: `Bot ${env.DISCORD_TOKEN}`,
-          "x-audit-log-reason": encodeURIComponent("X OAuth verification completed"),
-        },
-      },
-  );
-  if (!removeResponse.ok && removeResponse.status !== 404) {
-    console.warn(JSON.stringify({ event: "discord_unverified_role_remove_failed", status: removeResponse.status, userId: result.discordUserId }));
-  }
+  await syncVerifiedRoles(env, result.guildId, result.discordUserId);
   return { username: result.username };
 }
 

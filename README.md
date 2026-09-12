@@ -7,6 +7,7 @@
 - 在 Discord 验证频道发布 X 授权按钮。
 - 使用 OAuth 2.0 Authorization Code + PKCE 获取当前 X 用户资料。
 - 验证成功后添加 `Member` 类普通角色，并移除 `Unverified` 角色。
+- 已绑定用户退群后重新加入，点击验证按钮会恢复身份组，无需再次授权 X；发放失败时可再次点击重试。
 - 使用 D1 保存 Discord 与 X 账号映射，不保存 X access token。
 - `/xauth-status user:@成员` 供拥有“管理服务器”权限的管理员查询。
 - OAuth state 一次性使用，默认 2 小时过期；回调处理会注册为后台任务，浏览器提前断开也不会中止验证。

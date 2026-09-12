@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test": "tsx --test tests/*.test.ts",
     "cf-typegen": "wrangler types",
     "check": "npm run cf-typegen && tsc --noEmit",
     "dev": "wrangler dev",

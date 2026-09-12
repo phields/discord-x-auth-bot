@@ -1,5 +1,6 @@
 import { Button, Components, DiscordHono } from "discord-hono";
-import { createAuthorizationUrl } from "./x-oauth";
+import { createAuthorizationUrl, OAuthError } from "./x-oauth";
+import { syncVerifiedRoles } from "./discord-roles";
 import type { DiscordEnv, XAuthRecord } from "./types";
 
 const EPHEMERAL = 1 << 6;
@@ -44,17 +45,28 @@ export const discordApp = new DiscordHono<DiscordEnv>({
     if (!userId || !guildId || guildId !== c.env.DISCORD_GUILD_ID) {
       return c.res({ content: "请在指定服务器内使用此验证按钮。", flags: EPHEMERAL });
     }
-    const existing = await c.env.DB.prepare(
-      "SELECT x_username FROM x_auth WHERE discord_user_id = ?1",
-    ).bind(userId).first<{ x_username: string }>();
-    if (existing) {
-      return c.res({ content: `你已经绑定 X：@${existing.x_username}`, flags: EPHEMERAL });
-    }
-    const url = await createAuthorizationUrl(c.env, userId, guildId);
-    return c.res({
-      content: "授权链接 2 小时内有效。完成后将自动获得 Member Role。",
-      flags: EPHEMERAL,
-      components: new Components().row(new Button(url, "前往 X 授权", "Link")),
+    return c.flags("EPHEMERAL").resDefer(async (c) => {
+      try {
+        const existing = await c.env.DB.prepare(
+          "SELECT x_username FROM x_auth WHERE discord_user_id = ?1",
+        ).bind(userId).first<{ x_username: string }>();
+        if (existing) {
+          await syncVerifiedRoles(c.env, guildId, userId);
+          await c.followup({
+            content: `你已经绑定 X：@${existing.x_username}，已恢复 Member 身份组，无需重新授权。`,
+            allowed_mentions: { parse: [] },
+          });
+          return;
+        }
+        const url = await createAuthorizationUrl(c.env, userId, guildId);
+        await c.followup({
+          content: "授权链接 2 小时内有效。完成后将自动获得 Member Role。",
+          components: new Components().row(new Button(url, "前往 X 授权", "Link")),
+        });
+      } catch (error) {
+        console.error(JSON.stringify({ event: "x_auth_start_failed", userId, guildId, expected: error instanceof OAuthError }));
+        await c.followup(error instanceof OAuthError ? error.message : "验证处理失败，请再次点击按钮重试或联系管理员。");
+      }
     });
   })
   .command("xauth-status", async (c) => {
